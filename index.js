@@ -16,6 +16,22 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+async function run() {
+  try {
+    const categoriesCollection = client
+      .db("BikeTrader")
+      .collection("categories");
+
+    app.get("/categories", async (req, res) => {
+      const query = {};
+      const result = await categoriesCollection.find(query).toArray();
+      res.send(result);
+    });
+  } finally {
+  }
+}
+run().catch((er) => console.log(er));
+
 app.get("/", (req, res) => {
   res.send("Bike reader server is running");
 });
