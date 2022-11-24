@@ -23,6 +23,7 @@ async function run() {
       .collection("categories");
     const bikesCollection = client.db("BikeTrader").collection("bikes");
     const usersCollection = client.db("BikeTrader").collection("users");
+    const bookingsCollection = client.db("BikeTrader").collection("bookings");
 
     app.get("/categories", async (req, res) => {
       const query = {};
@@ -45,6 +46,12 @@ async function run() {
         return;
       }
       const result = await usersCollection.insertOne(users);
+      res.send(result);
+    });
+
+    app.post("/bookings", async (req, res) => {
+      const booking = req.body;
+      const result = await bookingsCollection.insertOne(booking);
       res.send(result);
     });
   } finally {
