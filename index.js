@@ -21,11 +21,19 @@ async function run() {
     const categoriesCollection = client
       .db("BikeTrader")
       .collection("categories");
+    const bikesCollection = client.db("BikeTrader").collection("bikes");
 
     app.get("/categories", async (req, res) => {
       const query = {};
       const result = await categoriesCollection.find(query).toArray();
       res.send(result);
+    });
+
+    app.get("/categories/:name", async (req, res) => {
+      const name = req.params.name;
+      const query = { category: name };
+      const bikes = await bikesCollection.find(query).toArray();
+      res.send(bikes);
     });
   } finally {
   }
