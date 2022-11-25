@@ -38,6 +38,21 @@ async function run() {
       res.send(bikes);
     });
 
+    app.post("/bikes", async (req, res) => {
+      const bikeData = req.body;
+      const bikes = await bikesCollection.insertOne(bikeData);
+      res.send(bikes);
+    });
+
+    app.get("/category", async (req, res) => {
+      const query = {};
+      const result = await categoriesCollection
+        .find(query)
+        .project({ name: 1 })
+        .toArray();
+      res.send(result);
+    });
+
     app.get("/users/role/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
