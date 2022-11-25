@@ -38,6 +38,14 @@ async function run() {
       res.send(bikes);
     });
 
+    app.get("/users/role/:email", async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      res.send({ role: user?.type });
+    });
+
     app.post("/users", async (req, res) => {
       const users = req.body;
       const query = { email: users.email };
