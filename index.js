@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
@@ -40,10 +40,20 @@ async function run() {
 
     app.get("/users/role/:email", async (req, res) => {
       const email = req.params.email;
-      console.log(email);
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       res.send({ role: user?.type });
+    });
+
+    app.get("/users/seller", async (req, res) => {
+      const query = { type: "Seller" };
+      const sellers = await usersCollection.find(query).toArray();
+      res.send(sellers);
+    });
+    app.get("/users/buyer", async (req, res) => {
+      const query = { type: "Buyer" };
+      const buyers = await usersCollection.find(query).toArray();
+      res.send(buyers);
     });
 
     app.post("/users", async (req, res) => {
@@ -55,6 +65,13 @@ async function run() {
       }
       const result = await usersCollection.insertOne(users);
       res.send(result);
+    });
+
+    app.delete("/users/buyer/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const user = await usersCollection.deleteOne(query);
+      res.send(user);
     });
 
     app.post("/bookings", async (req, res) => {
