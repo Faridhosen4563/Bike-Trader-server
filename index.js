@@ -26,6 +26,10 @@ async function run() {
     const usersCollection = client.db("BikeTrader").collection("users");
     const bookingsCollection = client.db("BikeTrader").collection("bookings");
     const paymentCollection = client.db("BikeTrader").collection("payment");
+    const reportsCollection = client.db("BikeTrader").collection("reports");
+    const advertisesCollection = client
+      .db("BikeTrader")
+      .collection("advertises");
 
     app.get("/categories", async (req, res) => {
       const query = {};
@@ -87,6 +91,13 @@ async function run() {
       res.send(buyers);
     });
 
+    app.get("/user/sellerVerify/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      res.send(user);
+    });
+
     app.post("/users", async (req, res) => {
       const users = req.body;
       const query = { email: users.email };
@@ -103,6 +114,27 @@ async function run() {
       const query = { _id: ObjectId(id) };
       const user = await usersCollection.deleteOne(query);
       res.send(user);
+    });
+
+    app.put("/users/sellerVerify/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const filter = { _id: ObjectId(id) };
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: {
+            verify: true,
+          },
+        };
+        const update = await usersCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.send(update);
+      } catch (error) {
+        console.log(error);
+      }
     });
 
     app.post("/create-payment-intent", async (req, res) => {
@@ -159,6 +191,39 @@ async function run() {
       };
       const update = await bookingsCollection.updateOne(query, updateDoc);
       const updateBike = await bikesCollection.updateOne(filter, updateSold);
+      res.send(result);
+    });
+
+    app.get("/reports", async (req, res) => {
+      try {
+        const query = {};
+        const reportItems = await reportsCollection.find(query).toArray();
+        res.send(reportItems);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    app.post("/reports", async (req, res) => {
+      try {
+        const report = req.body;
+        const result = await reportsCollection.insertOne(report);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    app.delete("/reports/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await reportsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.post("/advertises", async (req, res) => {
+      const advertise = req.body;
+      const result = await advertisesCollection.insertOne(advertise);
       res.send(result);
     });
   } finally {
