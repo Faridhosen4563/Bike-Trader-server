@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SK);
 
@@ -17,6 +18,21 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send("Unauthorized access");
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+    if (err) {
+      return res.status(401).send("Unauthorized access");
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
 async function run() {
   try {
     const categoriesCollection = client
@@ -31,33 +47,83 @@ async function run() {
       .db("BikeTrader")
       .collection("advertises");
 
+    async function verifyBuyer(req, res, next) {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+      if (user.type !== "Buyer") {
+        return res.status(403).send("Forbidden user");
+      }
+      next();
+    }
+
+    const verifySeller = async (req, res, next) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+      if (user.type !== "Seller") {
+        return res.status(403).send("Forbidden user");
+      }
+      next();
+    };
+    const verifyAdmin = async (req, res, next) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+      if (user.type !== "Admin") {
+        return res.status(403).send("Forbidden user");
+      }
+      next();
+    };
+
+    app.get("/jwt", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user) {
+        const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+          expiresIn: "7d",
+        });
+        res.send({ token });
+      } else {
+        res.status(401).send({ token: "" });
+      }
+    });
+
     app.get("/categories", async (req, res) => {
       const query = {};
       const result = await categoriesCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.get("/categories/:name", async (req, res) => {
+    app.get("/categories/:name", verifyJWT, async (req, res) => {
       const name = req.params.name;
       const query = { category: name };
       const bikes = await bikesCollection.find(query).toArray();
       res.send(bikes);
     });
 
-    app.get("/products", async (req, res) => {
+    app.get("/products", verifyJWT, verifySeller, async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
       const products = await bikesCollection.find(query).toArray();
       res.send(products);
     });
 
-    app.post("/bikes", async (req, res) => {
+    app.get("/bikes/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await bikesCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post("/bikes", verifyJWT, verifySeller, async (req, res) => {
       const bikeData = req.body;
       const bikes = await bikesCollection.insertOne(bikeData);
       res.send(bikes);
     });
 
-    app.delete("/bikes/:id", async (req, res) => {
+    app.delete("/bikes/:id", verifyJWT, verifySeller, async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const result = await bikesCollection.deleteOne(query);
@@ -80,12 +146,12 @@ async function run() {
       res.send({ role: user?.type });
     });
 
-    app.get("/users/seller", async (req, res) => {
+    app.get("/users/seller", verifyJWT, verifyAdmin, async (req, res) => {
       const query = { type: "Seller" };
       const sellers = await usersCollection.find(query).toArray();
       res.send(sellers);
     });
-    app.get("/users/buyer", async (req, res) => {
+    app.get("/users/buyer", verifyJWT, verifyAdmin, async (req, res) => {
       const query = { type: "Buyer" };
       const buyers = await usersCollection.find(query).toArray();
       res.send(buyers);
@@ -109,33 +175,38 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/users/buyer/:id", async (req, res) => {
+    app.delete("/users/buyer/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const user = await usersCollection.deleteOne(query);
       res.send(user);
     });
 
-    app.put("/users/sellerVerify/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const filter = { _id: ObjectId(id) };
-        const options = { upsert: true };
-        const updateDoc = {
-          $set: {
-            verify: true,
-          },
-        };
-        const update = await usersCollection.updateOne(
-          filter,
-          updateDoc,
-          options
-        );
-        res.send(update);
-      } catch (error) {
-        console.log(error);
+    app.put(
+      "/users/sellerVerify/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const filter = { _id: ObjectId(id) };
+          const options = { upsert: true };
+          const updateDoc = {
+            $set: {
+              verify: true,
+            },
+          };
+          const update = await usersCollection.updateOne(
+            filter,
+            updateDoc,
+            options
+          );
+          res.send(update);
+        } catch (error) {
+          console.log(error);
+        }
       }
-    });
+    );
 
     app.post("/create-payment-intent", async (req, res) => {
       const booking = req.body;
@@ -152,7 +223,7 @@ async function run() {
       });
     });
 
-    app.get("/bookings", async (req, res) => {
+    app.get("/bookings", verifyJWT, verifyBuyer, async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
       const result = await bookingsCollection.find(query).toArray();
@@ -168,6 +239,13 @@ async function run() {
     app.post("/bookings", async (req, res) => {
       const booking = req.body;
       const result = await bookingsCollection.insertOne(booking);
+      res.send(result);
+    });
+
+    app.delete("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await bookingsCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -194,7 +272,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/reports", async (req, res) => {
+    app.get("/reports", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const query = {};
         const reportItems = await reportsCollection.find(query).toArray();
@@ -204,7 +282,7 @@ async function run() {
       }
     });
 
-    app.post("/reports", async (req, res) => {
+    app.post("/reports", verifyJWT, async (req, res) => {
       try {
         const report = req.body;
         const result = await reportsCollection.insertOne(report);
@@ -216,12 +294,18 @@ async function run() {
 
     app.delete("/reports/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: ObjectId(id) };
+      const query = { _id: id };
       const result = await reportsCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.post("/advertises", async (req, res) => {
+    app.get("/advertises", async (req, res) => {
+      const query = {};
+      const result = await advertisesCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/advertises", verifyJWT, verifySeller, async (req, res) => {
       const advertise = req.body;
       const result = await advertisesCollection.insertOne(advertise);
       res.send(result);
