@@ -165,10 +165,14 @@ async function run() {
     });
 
     app.get("/user/sellerVerify/:email", async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      res.send(user);
+      try {
+        const email = req.params.email;
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+        res.send(user);
+      } catch (error) {
+        console.log(error);
+      }
     });
 
     app.post("/users", async (req, res) => {
