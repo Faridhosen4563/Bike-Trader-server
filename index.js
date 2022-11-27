@@ -303,6 +303,8 @@ async function run() {
       const id = req.params.id;
       const query = { _id: id };
       const result = await reportsCollection.deleteOne(query);
+      const filter = { _id: ObjectId(id) };
+      const bike = await bikesCollection.deleteOne(filter);
       res.send(result);
     });
 
