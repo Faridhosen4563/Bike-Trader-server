@@ -299,7 +299,7 @@ async function run() {
       }
     });
 
-    app.delete("/reports/:id", async (req, res) => {
+    app.delete("/reports/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: id };
       const result = await reportsCollection.deleteOne(query);
@@ -318,6 +318,23 @@ async function run() {
       const advertise = req.body;
       const result = await advertisesCollection.insertOne(advertise);
       res.send(result);
+    });
+
+    app.put("/makeAdmin/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          type: "Admin",
+        },
+      };
+      const updateRole = await usersCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(updateRole);
     });
   } finally {
   }
