@@ -46,6 +46,7 @@ async function run() {
     const advertisesCollection = client
       .db("BikeTrader")
       .collection("advertises");
+    const blogsCollection = client.db("BikeTrader").collection("blogs");
 
     async function verifyBuyer(req, res, next) {
       const decodedEmail = req.decoded.email;
@@ -114,6 +115,12 @@ async function run() {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const result = await bikesCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.get("/blogs", async (req, res) => {
+      const query = {};
+      const result = await blogsCollection.find(query).toArray();
       res.send(result);
     });
 
